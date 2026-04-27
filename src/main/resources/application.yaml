@@ -4,3 +4,22 @@ spring:
 
   config:
     import: optional:configserver:http://config-service:8888
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 4
+        failureRateThreshold: 50
+        minimumNumberOfCalls: 4
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+
+logging:
+  level:
+    io.github.resilience4j: DEBUG

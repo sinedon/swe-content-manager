@@ -2,7 +2,12 @@ package com.swe.project.contentmanager.client;
 
 import com.swe.project.contentmanager.dto.CreateTopicRequest;
 import com.swe.project.contentmanager.dto.HotspotRequest;
+
+import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -24,12 +29,28 @@ public class ContentAccessClient {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    @Autowired
+    private CircuitBreakerFactory circuitBreakerFactory;
+
     @Value("${content.access.url:http://localhost:8083}")
     private String contentAccessUrl;
 
     public ResponseEntity<String> getAllTopics() {
+        CircuitBreaker cb = circuitBreakerFactory.create("contentAccessCB");
+
         String url = contentAccessUrl + "/topics";
-        return cleanStringResponse(restTemplate.exchange(url, HttpMethod.GET, null, String.class));
+
+        return cb.run(
+            () -> cleanStringResponse(
+                    restTemplate.exchange(url, HttpMethod.GET, null, String.class)
+            ),
+            throwable -> fallbackTopics(throwable)
+        );
+    }
+
+    private ResponseEntity<String> fallbackTopics(Throwable t) {
+        System.out.println("Fallback triggered: " + t.getMessage());
+        return ResponseEntity.ok("[]"); 
     }
 
     public ResponseEntity<String> getTopic(String id) {

@@ -6,19 +6,43 @@ import com.swe.project.contentmanager.dto.HotspotRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 @Service
 public class ContentService {
 
     private final ContentAccessClient client;
 
+    //Circuit Breaker Code
+    //this should be replaced with a structured cache that keeps requests like ArrayList<Topic> I think
+    //Might need to modify it for 
+    private String cachedTopics = "[]";
+
     public ContentService(ContentAccessClient client) {
         this.client = client;
     }
 
+    @CircuitBreaker(name = "contentAccess", fallbackMethod = "fallbackTest")
     public ResponseEntity<String> getAllTopics() {
-        return client.getAllTopics();
+        return executeGetAllTopics();
     }
+
+    public ResponseEntity<String> executeGetAllTopics() {
+        ResponseEntity<String> response = client.getAllTopics();
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            cachedTopics = response.getBody(); 
+        }
+
+        return response;
+    }
+
+    public ResponseEntity<String> fallbackTest(Throwable t) {
+        System.out.println("FALLBACK TRIGGERED: " + t.getMessage());
+        return ResponseEntity.ok(cachedTopics);
+    }
+
+    //End Circuit Breaker Code (Might need to make one for hotspot)
 
     public ResponseEntity<String> getTopic(String id) {
         return client.getTopic(id);
